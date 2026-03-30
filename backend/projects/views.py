@@ -331,21 +331,59 @@ class BeneficiaryViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def summary(self, request):
         from django.db.models import Count
-        
-        by_gender = self.get_queryset().values('gender').annotate(count=Count('id'))
-        gender_map = {item['gender']: item['count'] for item in by_gender if item['gender']}
-        
-        by_vulnerability = self.get_queryset().values('vulnerability_category').annotate(count=Count('id'))
+        from datetime import date
+
+        queryset = self.get_queryset()
+        total = queryset.count()
+
+        # Gender distribution
+        by_gender = queryset.values('gender').annotate(count=Count('id'))
+        gender_map = {}
+        for item in by_gender:
+            if item['gender']:
+                # Use display name for frontend
+                display = 'Male' if item['gender'] == 'MALE' else 'Female' if item['gender'] == 'FEMALE' else 'Other'
+                gender_map[display] = item['count']
+
+        # Vulnerability distribution
+        by_vulnerability = queryset.values('vulnerability_category').annotate(count=Count('id'))
         vulnerability_map = {item['vulnerability_category']: item['count'] for item in by_vulnerability if item['vulnerability_category']}
-        
-        by_residence = self.get_queryset().values('residence_type').annotate(count=Count('id'))
+
+        # Residence distribution
+        by_residence = queryset.values('residence_type').annotate(count=Count('id'))
         residence_map = {item['residence_type']: item['count'] for item in by_residence if item['residence_type']}
-        
+
+        # Age group distribution
+        current_year = date.today().year
+        age_groups = {
+            '0-14': 0,
+            '15-24': 0,
+            '25-64': 0,
+            '65+': 0
+        }
+
+        for ben in queryset.filter(year_of_birth__isnull=False):
+            age = current_year - ben.year_of_birth
+            if age <= 14:
+                age_groups['0-14'] += 1
+            elif age <= 24:
+                age_groups['15-24'] += 1
+            elif age <= 64:
+                age_groups['25-64'] += 1
+            else:
+                age_groups['65+'] += 1
+
+        # Calculate rural deployment rate
+        rural_count = queryset.filter(residence_type='RURAL').count()
+        rural_rate = round((rural_count / total * 100), 1) if total > 0 else 0
+
         return Response({
             "by_gender": gender_map,
             "by_vulnerability": vulnerability_map,
             "by_residence": residence_map,
-            "total": self.get_queryset().count()
+            "by_age": age_groups,
+            "total": total,
+            "rural_deployment_rate": rural_rate
         })
 
 class SDGViewSet(viewsets.ReadOnlyModelViewSet):

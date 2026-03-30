@@ -489,6 +489,8 @@ class ReportsViewSet(viewsets.ViewSet):
     @action(detail=False, methods=['get'])
     def project_comparison(self, request):
         """Side-by-side metrics for selected projects"""
+        from django.db.models import Count, Sum
+        
         ids = request.query_params.getlist('ids')
         if not ids:
             return Response({"error": "No project IDs provided"}, status=400)

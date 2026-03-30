@@ -40,29 +40,10 @@ class IndicatorTargetSerializer(serializers.ModelSerializer):
 
     def get_latest_value(self, obj):
         if obj.indicator.unit_type == 'FORMULA' and obj.indicator.formula_definition:
-            import re
-            formula = obj.indicator.formula_definition
-            placeholders = re.findall(r'\{([a-f0-9\-]{32,})\}', formula) # Match UUIDs
-            
-            # Get other targets for this project
-            other_targets = IndicatorTarget.objects.filter(project=obj.project).select_related('indicator')
-            target_map = {str(t.indicator.id): t for t in other_targets}
-            
-            evaluated_formula = formula
-            for ind_id in placeholders:
-                target = target_map.get(ind_id)
-                val = 0
-                if target and target.id != obj.id:
-                    # Use latest VERIFIED result or baseline
-                    latest = target.results.filter(status='VERIFIED').first()
-                    val = latest.value if latest else target.baseline_value
-                
-                evaluated_formula = evaluated_formula.replace(f'{{{ind_id}}}', str(val))
-            
             try:
-                # Safe eval for basic arithmetic
-                return eval(evaluated_formula, {"__builtins__": None}, {})
-            except:
+                from .formula import resolve_formula
+                return resolve_formula(obj.indicator.formula_definition, obj, obj.project)
+            except Exception:
                 return 0
 
         # Normal indicators: Only show VERIFIED results as current value

@@ -18,6 +18,47 @@ class IndicatorViewSet(viewsets.ModelViewSet):
     filter_backends = [filters.SearchFilter]
     search_fields = ['name', 'definition']
 
+    @action(detail=False, methods=['post'], url_path='validate_formula')
+    def validate_formula(self, request):
+        """
+        POST /api/indicators/validate_formula/
+        Body: { "formula": "{uuid1} + {uuid2}", "project_id": "uuid" }
+
+        Validates the formula string and optionally does a dry-run resolve
+        against real indicator values for the given project.
+        """
+        from .formula import validate_formula, resolve_formula
+        from .models import IndicatorTarget
+
+        formula = request.data.get('formula', '').strip()
+        project_id = request.data.get('project_id')
+
+        if not formula:
+            return Response({'valid': False, 'error': 'Formula is required.'}, status=400)
+
+        ok, error = validate_formula(formula)
+        if not ok:
+            return Response({'valid': False, 'error': error})
+
+        # Optional: dry-run with real project values
+        preview_value = None
+        if project_id:
+            from projects.models import Project
+            try:
+                project = Project.objects.get(id=project_id)
+                # Use a dummy target (no id) — resolve_formula handles missing self safely
+                class _DummyTarget:
+                    id = None
+                    baseline_value = 0
+                preview_value = resolve_formula(formula, _DummyTarget(), project)
+            except Exception as e:
+                preview_value = None
+
+        return Response({
+            'valid': True,
+            'preview_value': preview_value,
+        })
+
     @action(detail=False, methods=['get'])
     def scorecard(self, request):
         from django.db.models import Sum, Avg, F

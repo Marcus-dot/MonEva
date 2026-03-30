@@ -1,0 +1,37 @@
+{% extends "emails/base.html" %}
+
+{% block content %}
+<h2>Contract Expiry Alert</h2>
+<p>Hello {{ recipient_name }},</p>
+
+<div class="alert">
+    <strong>A contract is approaching its expiration date.</strong>
+</div>
+
+<p><strong>Contract Details:</strong></p>
+<ul>
+    <li><strong>Contract ID:</strong> {{ contract_id }}</li>
+    <li><strong>Contractor:</strong> {{ contractor_name }}</li>
+    <li><strong>Project:</strong> {{ project_name }}</li>
+    <li><strong>Expiration Date:</strong> <strong style="color: #d9534f;">{{ expiry_date }}</strong></li>
+    <li><strong>Days Until Expiry:</strong> <strong style="color: #d9534f;">{{ days_until_expiry }}</strong></li>
+</ul>
+
+<p><strong>Contract Type:</strong> {{ contract_type }}</p>
+<p><strong>Value:</strong> ZMW {{ contract_value|floatformat:2 }}</p>
+
+<p><strong>Required Actions:</strong></p>
+<ul>
+    <li>Review contract terms for potential renewal or renegotiation</li>
+    <li>Coordinate with procurement for contract extension if needed</li>
+    <li>Plan transition if contract is not being renewed</li>
+</ul>
+
+{% if action_url %}
+<a href="{{ action_url }}" class="action-button">Manage Contract</a>
+{% endif %}
+
+<p>Please take timely action to avoid service interruption.</p>
+
+<p>Best regards,<br>MonEva System</p>
+{% endblock %}

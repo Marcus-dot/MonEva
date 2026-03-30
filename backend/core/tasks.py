@@ -245,7 +245,7 @@ def check_pending_approvals_escalation():
                 recipient=supervisor,
                 title="Pending Approval Requires Attention",
                 message=f"Payment claim #{claim.id[:8]} for ZMW {claim.amount:,.2f} has been pending for {days_pending} days. Immediate action required.",
-                notification_type=Notification.Type.ESCALATION,
+                notification_type=Notification.Type.WARNING,
                 related_model='PaymentClaim',
                 related_id=str(claim.id)
             )
@@ -267,7 +267,7 @@ def check_pending_approvals_escalation():
                 recipient=supervisor,
                 title="Unresolved Grievance Requires Attention",
                 message=f"Grievance #{grievance.id[:8]} has been unresolved for {days_pending} days. Immediate action required.",
-                notification_type=Notification.Type.ESCALATION,
+                notification_type=Notification.Type.WARNING,
                 related_model='Grievance',
                 related_id=str(grievance.id)
             )
@@ -295,7 +295,7 @@ def check_pending_approvals_escalation():
                 recipient=supervisor,
                 title="Investigation Requires Urgent Review",
                 message=f"{message} Immediate action required.",
-                notification_type=Notification.Type.ESCALATION,
+                notification_type=Notification.Type.WARNING,
                 related_model='Investigation',
                 related_id=str(investigation.id)
             )

@@ -1,0 +1,65 @@
+{% extends "emails/base.html" %}
+
+{% block content %}
+<h2>Your Daily Digest — {{ date|date:"j M Y" }}</h2>
+<p>Hello {{ recipient_name }},</p>
+
+<p>Here's a summary of pending actions that require your attention today:</p>
+
+{% if pending_claims %}
+<h3>Pending Payment Claims: {{ pending_claims|length }}</h3>
+<ul>
+{% for claim in pending_claims %}
+    <li>
+        <strong>{{ claim.contractor_name }}</strong> — ZMW {{ claim.amount|floatformat:2 }}
+        <br><em>Project: {{ claim.project_name }}</em>
+        <br><small>Submitted: {{ claim.submitted_date|date:"d M" }}</small>
+    </li>
+{% endfor %}
+</ul>
+{% endif %}
+
+{% if pending_grievances %}
+<h3>Open Grievances: {{ pending_grievances|length }}</h3>
+<ul>
+{% for grievance in pending_grievances %}
+    <li>
+        <strong>{{ grievance.category }}</strong>
+        <br><em>{{ grievance.summary|truncatewords:10 }}</em>
+        <br><small>Opened: {{ grievance.created_date|date:"d M" }}</small>
+    </li>
+{% endfor %}
+</ul>
+{% endif %}
+
+{% if pending_investigations %}
+<h3>Active Investigations: {{ pending_investigations|length }}</h3>
+<ul>
+{% for investigation in pending_investigations %}
+    <li>
+        <strong>{{ investigation.title }}</strong>
+        <br><em>Project: {{ investigation.project_name }}</em>
+        <br><small>Assigned: {{ investigation.assigned_date|date:"d M" }}</small>
+    </li>
+{% endfor %}
+</ul>
+{% endif %}
+
+{% if pending_approvals %}
+<h3>Awaiting Your Approval: {{ pending_approvals|length }}</h3>
+<ul>
+{% for item in pending_approvals %}
+    <li>
+        <strong>{{ item.type }}</strong> — {{ item.title }}
+        <br><small>Pending since: {{ item.pending_since|date:"d M" }}</small>
+    </li>
+{% endfor %}
+</ul>
+{% endif %}
+
+<p style="margin-top: 30px; color: #666; font-size: 12px;">
+    This is an automated digest. Log in to MonEva to view more details and take action on individual items.
+</p>
+
+<p>Best regards,<br>MonEva System</p>
+{% endblock %}

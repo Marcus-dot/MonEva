@@ -114,6 +114,9 @@ class Project(models.Model):
     assigned_team = models.ManyToManyField('core.User', related_name='assigned_projects', blank=True)
     partners = models.ManyToManyField(Organization, related_name='partner_projects', blank=True)
 
+    created_at = models.DateTimeField(auto_now_add=True, null=True)
+    updated_at = models.DateTimeField(auto_now=True, null=True)
+
     def __str__(self):
         return self.name
 
@@ -140,16 +143,96 @@ class Project(models.Model):
             raise ValidationError(errors)
 
 class Contract(models.Model):
+    class Status(models.TextChoices):
+        DRAFT = 'DRAFT', 'Draft'
+        ACTIVE = 'ACTIVE', 'Active'
+        SUSPENDED = 'SUSPENDED', 'Suspended'
+        CLOSED = 'CLOSED', 'Closed'
+        EXPIRED = 'EXPIRED', 'Expired'
+
+    class ContractType(models.TextChoices):
+        WORKS = 'WORKS', 'Works'
+        SUPPLY = 'SUPPLY', 'Supply of Goods'
+        SERVICE = 'SERVICE', 'Service'
+        CONSULTANCY = 'CONSULTANCY', 'Consultancy'
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='contracts')
     contractor = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='contracts')
+
+    # Core identification
+    contract_number = models.CharField(max_length=100, blank=True, help_text="e.g. KGLCDC/2026/001")
+    contract_type = models.CharField(max_length=20, choices=ContractType.choices, default=ContractType.WORKS)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT)
+
+    # Financial
     total_value = models.DecimalField(max_digits=15, decimal_places=2)
     currency = models.CharField(max_length=3, default='ZMW')
+    retention_percentage = models.DecimalField(
+        max_digits=5, decimal_places=2, default=10.00,
+        help_text="Retention % withheld until defects liability period ends"
+    )
+
+    # Dates
     start_date = models.DateField()
     end_date = models.DateField()
+    defects_liability_period = models.PositiveIntegerField(
+        default=365,
+        help_text="Defects liability period in days after completion"
+    )
+
+    # Location & scope
+    chiefdom = models.CharField(max_length=100, blank=True, help_text="Chiefdom/ward where works are executed")
+    scope_of_works = models.TextField(blank=True)
+    payment_terms = models.TextField(blank=True, help_text="e.g. 30 days from certified invoice")
+
+    # Document
+    document = models.FileField(upload_to='contracts/', null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True, null=True)
+    updated_at = models.DateTimeField(auto_now=True, null=True)
 
     def __str__(self):
-        return f"{self.project.name} - {self.contractor.name}"
+        return f"{self.contract_number or self.id} — {self.contractor.name}"
+
+    @property
+    def is_expired(self):
+        from django.utils import timezone
+        return self.end_date < timezone.now().date() and self.status == self.Status.ACTIVE
+
+
+class ContractAmendment(models.Model):
+    """Tracks changes made to a contract after signing (variations/extensions)"""
+    class AmendmentType(models.TextChoices):
+        EXTENSION = 'EXTENSION', 'Time Extension'
+        VARIATION = 'VARIATION', 'Variation Order'
+        SCOPE_CHANGE = 'SCOPE_CHANGE', 'Scope Change'
+        VALUE_ADJUSTMENT = 'VALUE_ADJUSTMENT', 'Value Adjustment'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    contract = models.ForeignKey(Contract, on_delete=models.CASCADE, related_name='amendments')
+    amendment_type = models.CharField(max_length=20, choices=AmendmentType.choices)
+    amendment_number = models.PositiveIntegerField(help_text="Sequential amendment number")
+    description = models.TextField()
+
+    # For time extensions
+    original_end_date = models.DateField(null=True, blank=True)
+    new_end_date = models.DateField(null=True, blank=True)
+
+    # For value adjustments
+    original_value = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
+    new_value = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
+
+    approved_by = models.ForeignKey('core.User', on_delete=models.SET_NULL, null=True, blank=True)
+    document = models.FileField(upload_to='contract_amendments/', null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['contract', 'amendment_number']
+        unique_together = [('contract', 'amendment_number')]
+
+    def __str__(self):
+        return f"Amendment #{self.amendment_number} — {self.contract}"
 
 class Milestone(models.Model):
     class Status(models.TextChoices):
@@ -253,7 +336,6 @@ class BeneficiaryFeedback(models.Model):
     
     beneficiary_id = models.CharField(max_length=100, blank=True, help_text="Anonymous ID or name")
     beneficiary_profile = models.ForeignKey('Beneficiary', on_delete=models.SET_NULL, null=True, blank=True, related_name='feedback_items')
-    contact_info = models.CharField(max_length=100, blank=True, help_text="Phone or Email")
     contact_info = models.CharField(max_length=100, blank=True, help_text="Phone or Email")
     
     created_at = models.DateTimeField(auto_now_add=True)

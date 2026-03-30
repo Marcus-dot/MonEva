@@ -1,0 +1,30 @@
+{% extends "emails/base.html" %}
+
+{% block content %}
+<h2>New Grievance Registered</h2>
+<p>Hello {{ recipient_name }},</p>
+
+<div class="info-box">
+    <strong>A grievance has been registered in the {{ project_name }} project.</strong>
+</div>
+
+<p><strong>Grievance Details:</strong></p>
+<ul>
+    <li><strong>ID:</strong> {{ grievance_id }}</li>
+    <li><strong>Category:</strong> {{ category }}</li>
+    <li><strong>Submitted By:</strong> {{ submitted_by }}</li>
+    <li><strong>Date:</strong> {{ date }}</li>
+    <li><strong>Status:</strong> {{ status }}</li>
+</ul>
+
+<p><strong>Summary:</strong></p>
+<p>{{ summary }}</p>
+
+{% if action_url %}
+<a href="{{ action_url }}" class="action-button">View Grievance Details</a>
+{% endif %}
+
+<p>Please review this grievance and take appropriate action according to the established procedures.</p>
+
+<p>Best regards,<br>MonEva System</p>
+{% endblock %}

@@ -1,0 +1,33 @@
+{% extends "emails/base.html" %}
+
+{% block content %}
+<h2>Investigation Assigned to You</h2>
+<p>Hello {{ recipient_name }},</p>
+
+<div class="info-box">
+    <strong>You have been assigned to investigate a grievance.</strong>
+</div>
+
+<p><strong>Investigation Details:</strong></p>
+<ul>
+    <li><strong>Investigation ID:</strong> {{ investigation_id }}</li>
+    <li><strong>Related Grievance:</strong> {{ grievance_id }}</li>
+    <li><strong>Project:</strong> {{ project_name }}</li>
+    <li><strong>Assigned Date:</strong> {{ assigned_date }}</li>
+    <li><strong>Target Completion:</strong> {{ target_date }}</li>
+</ul>
+
+<p><strong>Grievance Summary:</strong></p>
+<p>{{ grievance_summary }}</p>
+
+<p><strong>Instructions:</strong></p>
+<p>{{ instructions }}</p>
+
+{% if action_url %}
+<a href="{{ action_url }}" class="action-button">Start Investigation</a>
+{% endif %}
+
+<p>Please acknowledge receipt and begin your investigation as soon as possible.</p>
+
+<p>Best regards,<br>MonEva System</p>
+{% endblock %}

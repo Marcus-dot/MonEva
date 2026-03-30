@@ -1,11 +1,12 @@
 from rest_framework import viewsets, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from .models import Project, Contract, Milestone, ProjectComment, BeneficiaryFeedback
+from .models import Project, Contract, ContractAmendment, Milestone, ProjectComment, BeneficiaryFeedback
 from .serializers import (
-    ProjectSerializer, 
-    ContractSerializer, 
-    MilestoneSerializer, 
+    ProjectSerializer,
+    ContractSerializer,
+    ContractAmendmentSerializer,
+    MilestoneSerializer,
     ProjectCommentSerializer,
     BeneficiaryFeedbackSerializer,
     BeneficiarySerializer,
@@ -219,6 +220,22 @@ class ContractViewSet(viewsets.ModelViewSet):
         if project_id:
             queryset = queryset.filter(project_id=project_id)
         return queryset
+
+class ContractAmendmentViewSet(viewsets.ModelViewSet):
+    queryset = ContractAmendment.objects.all()
+    serializer_class = ContractAmendmentSerializer
+    permission_classes = [permissions.IsAuthenticated, IsProjectManager | ReadOnly]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        contract_id = self.request.query_params.get('contract')
+        if contract_id:
+            queryset = queryset.filter(contract_id=contract_id)
+        return queryset
+
+    def perform_create(self, serializer):
+        serializer.save(approved_by=self.request.user)
+
 
 class MilestoneViewSet(viewsets.ModelViewSet):
     queryset = Milestone.objects.all()

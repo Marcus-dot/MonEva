@@ -182,15 +182,15 @@ class Notification(models.Model):
         return url_mapping.get(self.related_model, '')
     
     @classmethod
-    def create_notification(cls, recipient, title, message, notification_type=Type.INFO, 
+    def create_notification(cls, recipient, title, message, notification_type=Type.INFO,
                           related_model='', related_id='', action_url=''):
-        """Helper method to create notifications"""
+        """Helper method to create notifications and trigger email"""
         # Auto-generate action_url if not provided but related_model/id exist
         if not action_url and related_model and related_id:
             temp_notif = cls(related_model=related_model, related_id=related_id)
             action_url = temp_notif.generate_action_url()
-        
-        return cls.objects.create(
+
+        notification = cls.objects.create(
             recipient=recipient,
             type=notification_type,
             title=title,
@@ -199,6 +199,23 @@ class Notification(models.Model):
             related_id=related_id,
             action_url=action_url
         )
+
+        # Also send email if recipient has an email address
+        if recipient.email:
+            try:
+                from core.emails import send_plain_notification_email
+                send_plain_notification_email(
+                    recipient_email=recipient.email,
+                    recipient_name=recipient.get_full_name() or recipient.username,
+                    title=title,
+                    message=message,
+                    action_url=action_url,
+                    notification_type=notification_type
+                )
+            except Exception:
+                pass  # Never break notification creation due to email failure
+
+        return notification
 
 class ScheduledReport(models.Model):
     """Configuration for automated report delivery"""
@@ -234,3 +251,26 @@ class ScheduledReport(models.Model):
 
     class Meta:
         ordering = ['next_run_at']
+
+class EmailLog(models.Model):
+    """Track all email sends for audit and retry"""
+    class Status(models.TextChoices):
+        PENDING = 'PENDING', 'Pending'
+        SENT = 'SENT', 'Sent'
+        FAILED = 'FAILED', 'Failed'
+        BOUNCED = 'BOUNCED', 'Bounced'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    recipient = models.EmailField()
+    notification_type = models.CharField(max_length=50)  # grievance_opened, contract_expiry, etc.
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+    error_message = models.TextField(blank=True)
+    sent_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [models.Index(fields=['recipient', 'status'])]
+
+    def __str__(self):
+        return f"{self.notification_type} to {self.recipient} ({self.status})"

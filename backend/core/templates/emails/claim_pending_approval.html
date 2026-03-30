@@ -1,0 +1,31 @@
+{% extends "emails/base.html" %}
+
+{% block content %}
+<h2>Payment Claim Awaiting Your Approval</h2>
+<p>Hello {{ recipient_name }},</p>
+
+<div class="alert">
+    <strong>A payment claim requires your approval before proceeding to payment.</strong>
+</div>
+
+<p><strong>Claim Details:</strong></p>
+<ul>
+    <li><strong>Claim ID:</strong> {{ claim_id }}</li>
+    <li><strong>Contractor:</strong> {{ contractor_name }}</li>
+    <li><strong>Project:</strong> {{ project_name }}</li>
+    <li><strong>Amount:</strong> ZMW {{ claim_amount|floatformat:2 }}</li>
+    <li><strong>Submitted Date:</strong> {{ submitted_date }}</li>
+    <li><strong>Submission Deadline:</strong> {{ deadline }}</li>
+</ul>
+
+<p><strong>Required Action:</strong></p>
+<p>As the Finance Checker, please review and approve or reject this claim within 2 business days.</p>
+
+{% if action_url %}
+<a href="{{ action_url }}" class="action-button">Review Claim</a>
+{% endif %}
+
+<p>Please ensure all supporting documents are in order before approving.</p>
+
+<p>Best regards,<br>MonEva System</p>
+{% endblock %}

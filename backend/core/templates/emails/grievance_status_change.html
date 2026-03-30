@@ -1,0 +1,29 @@
+{% extends "emails/base.html" %}
+
+{% block content %}
+<h2>Grievance Status Update</h2>
+<p>Hello {{ recipient_name }},</p>
+
+<div class="alert">
+    <strong>A grievance you reported has been updated.</strong>
+</div>
+
+<p><strong>Grievance Information:</strong></p>
+<ul>
+    <li><strong>ID:</strong> {{ grievance_id }}</li>
+    <li><strong>Previous Status:</strong> {{ previous_status }}</li>
+    <li><strong>Current Status:</strong> {{ current_status }}</li>
+    <li><strong>Updated On:</strong> {{ updated_date }}</li>
+</ul>
+
+<p><strong>Update Details:</strong></p>
+<p>{{ update_message }}</p>
+
+{% if action_url %}
+<a href="{{ action_url }}" class="action-button">View Full Details</a>
+{% endif %}
+
+<p>Thank you for bringing this matter to our attention.</p>
+
+<p>Best regards,<br>MonEva System</p>
+{% endblock %}

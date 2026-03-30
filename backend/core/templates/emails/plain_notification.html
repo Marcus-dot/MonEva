@@ -1,0 +1,9 @@
+{% extends "emails/base.html" %}
+{% block content %}
+<h2>{{ title }}</h2>
+<p>Hello {{ recipient_name }},</p>
+<p>{{ message }}</p>
+{% if action_url %}
+<a href="{{ action_url }}" class="action-button">View Details</a>
+{% endif %}
+{% endblock %}

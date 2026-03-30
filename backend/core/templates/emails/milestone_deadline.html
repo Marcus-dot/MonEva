@@ -1,0 +1,31 @@
+{% extends "emails/base.html" %}
+
+{% block content %}
+<h2>Milestone Deadline Approaching</h2>
+<p>Hello {{ recipient_name }},</p>
+
+<div class="alert">
+    <strong>An important project milestone is approaching its deadline.</strong>
+</div>
+
+<p><strong>Milestone Information:</strong></p>
+<ul>
+    <li><strong>Milestone:</strong> {{ milestone_name }}</li>
+    <li><strong>Project:</strong> {{ project_name }}</li>
+    <li><strong>Original Deadline:</strong> {{ original_deadline }}</li>
+    <li><strong>Current Status:</strong> {{ status }}</li>
+    <li><strong>Completion %:</strong> {{ completion_percentage }}%</li>
+    <li><strong>Days Remaining:</strong> <strong style="color: #d9534f;">{{ days_remaining }}</strong></li>
+</ul>
+
+<p><strong>Description:</strong></p>
+<p>{{ description }}</p>
+
+{% if action_url %}
+<a href="{{ action_url }}" class="action-button">View Milestone</a>
+{% endif %}
+
+<p>Please ensure timely completion to keep the project on schedule.</p>
+
+<p>Best regards,<br>MonEva System</p>
+{% endblock %}

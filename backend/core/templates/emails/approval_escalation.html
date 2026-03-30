@@ -1,0 +1,33 @@
+{% extends "emails/base.html" %}
+
+{% block content %}
+<h2>Approval Escalation Required</h2>
+<p>Hello {{ recipient_name }},</p>
+
+<div class="alert">
+    <strong>An approval has been escalated and requires your immediate attention.</strong>
+</div>
+
+<p><strong>Escalation Details:</strong></p>
+<ul>
+    <li><strong>Request Type:</strong> {{ request_type }}</li>
+    <li><strong>Request ID:</strong> {{ request_id }}</li>
+    <li><strong>Project:</strong> {{ project_name }}</li>
+    <li><strong>Escalated By:</strong> {{ escalated_by }}</li>
+    <li><strong>Escalation Reason:</strong> {{ escalation_reason }}</li>
+    <li><strong>Escalated Date:</strong> {{ escalated_date }}</li>
+</ul>
+
+<p><strong>Details:</strong></p>
+<p>{{ details }}</p>
+
+<p><strong>Required Action:</strong> Please review and make a decision on this escalated request within 1 business day.</p>
+
+{% if action_url %}
+<a href="{{ action_url }}" class="action-button">Review Escalation</a>
+{% endif %}
+
+<p>This matter has been escalated due to time sensitivity and requires your prompt attention.</p>
+
+<p>Best regards,<br>MonEva System</p>
+{% endblock %}

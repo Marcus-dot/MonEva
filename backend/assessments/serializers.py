@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Inspection, Evidence
+from .models import Inspection, Evidence, EvaluationTemplate
 
 class EvidenceSerializer(serializers.ModelSerializer):
     class Meta:
@@ -14,6 +14,15 @@ class InspectionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Inspection
         fields = '__all__'
+
+class EvaluationTemplateSerializer(serializers.ModelSerializer):
+    created_by_name = serializers.ReadOnlyField(source='created_by.get_full_name')
+
+    class Meta:
+        model = EvaluationTemplate
+        fields = '__all__'
+        read_only_fields = ['created_by', 'created_at', 'updated_at']
+
 
 class PostProjectEvaluationSerializer(serializers.ModelSerializer):
     evaluated_by_name = serializers.ReadOnlyField(source='evaluated_by.username')

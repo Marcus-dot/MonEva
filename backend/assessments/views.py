@@ -1,6 +1,6 @@
 from rest_framework import viewsets, permissions
-from .models import Inspection, Evidence
-from .serializers import InspectionSerializer, EvidenceSerializer, PostProjectEvaluationSerializer, ImpactFollowUpSerializer
+from .models import Inspection, Evidence, EvaluationTemplate
+from .serializers import InspectionSerializer, EvidenceSerializer, PostProjectEvaluationSerializer, ImpactFollowUpSerializer, EvaluationTemplateSerializer
 
 from core.permissions import IsInspector, ReadOnly
 
@@ -30,6 +30,15 @@ class PostProjectEvaluationViewSet(viewsets.ModelViewSet):
         # Phase 12 Automation: Schedule Follow-ups?
         # Ideally we'd do this via a signal on Project.status='COMPLETED' or here.
         # For prototype, we can trigger it here or manually.
+
+class EvaluationTemplateViewSet(viewsets.ModelViewSet):
+    queryset = EvaluationTemplate.objects.all()
+    serializer_class = EvaluationTemplateSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
+
 
 class ImpactFollowUpViewSet(viewsets.ModelViewSet):
     from .models import ImpactFollowUp

@@ -101,21 +101,70 @@ from projects.automation import sync_inspection_to_milestone
 def inspection_sync_handler(sender, instance, **kwargs):
     sync_inspection_to_milestone(instance)
 
+class EvaluationTemplate(models.Model):
+    """
+    Reusable questionnaire template for post-project evaluations.
+    Admins configure question sets; evaluators fill them in at close-out.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    # questions stored as list of {id, label, type: text|rating|boolean, required: bool}
+    questions = models.JSONField(
+        default=list,
+        help_text='List of question objects: [{id, label, type, required}]'
+    )
+    is_default = models.BooleanField(
+        default=False,
+        help_text='Auto-apply to all projects on completion if no template specified'
+    )
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='eval_templates')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-is_default', 'name']
+
+    def __str__(self):
+        return self.name
+
+    def save(self, *args, **kwargs):
+        # Only one template can be the default
+        if self.is_default:
+            EvaluationTemplate.objects.exclude(pk=self.pk).filter(is_default=True).update(is_default=False)
+        super().save(*args, **kwargs)
+
+
 class PostProjectEvaluation(models.Model):
     """
-    One-off evaluation done immediately after project close.
+    One-off structured evaluation done immediately after project close.
     """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     project = models.OneToOneField('projects.Project', on_delete=models.CASCADE, related_name='post_project_evaluation')
-    
+    template = models.ForeignKey(
+        EvaluationTemplate, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='evaluations'
+    )
+
+    # Structured answers matching template questions
+    # Stored as {question_id: answer_value}
+    responses = models.JSONField(
+        default=dict,
+        help_text='Answers keyed by question ID from template'
+    )
+
+    # Summary fields always present regardless of template
     sustainability_rating = models.IntegerField(
         validators=[MinValueValidator(1), MaxValueValidator(5)],
         help_text="1 (Poor) to 5 (Excellent) likelihood of sustained impact"
     )
-    
+    objectives_achieved = models.BooleanField(
+        default=False,
+        help_text="Were the original project objectives fully achieved?"
+    )
     lessons_learned = models.TextField()
     future_recommendations = models.TextField()
-    
+
     evaluated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
     evaluated_at = models.DateTimeField(auto_now_add=True)
 

@@ -10,7 +10,7 @@ from projects.views import (
     ProjectCommentViewSet, BeneficiaryFeedbackViewSet,
     BeneficiaryViewSet, SDGViewSet
 )
-from assessments.views import InspectionViewSet, EvidenceViewSet, PostProjectEvaluationViewSet, ImpactFollowUpViewSet
+from assessments.views import InspectionViewSet, EvidenceViewSet, PostProjectEvaluationViewSet, ImpactFollowUpViewSet, EvaluationTemplateViewSet
 from finance.views import PaymentClaimViewSet, ClaimCommentViewSet
 from grievances.views import GrievanceViewSet
 from investigations.views import InvestigationViewSet, InvestigationUpdateViewSet, InvestigationEvidenceViewSet, InvestigationNoteViewSet, InvestigationMilestoneViewSet
@@ -40,6 +40,7 @@ router.register(r'beneficiaries', BeneficiaryViewSet)
 router.register(r'sdgs', SDGViewSet, basename='sdgs')
 router.register(r'inspections', InspectionViewSet)
 router.register(r'evidence', EvidenceViewSet)
+router.register(r'evaluation-templates', EvaluationTemplateViewSet, basename='evaluation-templates')
 router.register(r'post-project-evaluations', PostProjectEvaluationViewSet)
 router.register(r'impact-followups', ImpactFollowUpViewSet)
 router.register(r'claims', PaymentClaimViewSet)

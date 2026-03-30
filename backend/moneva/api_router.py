@@ -1,8 +1,9 @@
 from rest_framework.routers import DefaultRouter
 from core.views import (
-    UserViewSet, OrganizationViewSet, DashboardViewSet, ReportsViewSet, 
-    ActivityLogViewSet, DashboardPreferenceViewSet, PermissionViewSet, 
-    RoleViewSet, NotificationViewSet, GlobalSearchViewSet, ScheduledReportViewSet
+    UserViewSet, OrganizationViewSet, DashboardViewSet, ReportsViewSet,
+    ActivityLogViewSet, DashboardPreferenceViewSet, PermissionViewSet,
+    RoleViewSet, NotificationViewSet, GlobalSearchViewSet, ScheduledReportViewSet,
+    DocumentViewSet
 )
 from projects.views import (
     ProjectViewSet, ContractViewSet, ContractAmendmentViewSet, MilestoneViewSet,
@@ -27,6 +28,7 @@ router.register(r'activity-logs', ActivityLogViewSet, basename='activity-logs')
 router.register(r'dashboard-preferences', DashboardPreferenceViewSet, basename='dashboard-preferences')
 router.register(r'notifications', NotificationViewSet, basename='notifications')
 router.register(r'scheduled-reports', ScheduledReportViewSet, basename='scheduled-reports')
+router.register(r'documents', DocumentViewSet, basename='documents')
 router.register(r'organizations', OrganizationViewSet)
 router.register(r'projects', ProjectViewSet)
 router.register(r'project-comments', ProjectCommentViewSet)

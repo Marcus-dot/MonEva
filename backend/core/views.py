@@ -1,9 +1,9 @@
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
-from rest_framework import viewsets, permissions, status
+from rest_framework import viewsets, permissions, status, serializers, parsers
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from .models import User, Organization, ActivityLog, DashboardPreference, Permission, Role, Notification, ScheduledReport
+from .models import User, Organization, ActivityLog, DashboardPreference, Permission, Role, Notification, ScheduledReport, Document
 from projects.models import Project, Milestone, Contract
 from finance.models import PaymentClaim
 from investigations.models import Investigation
@@ -845,3 +845,57 @@ class ScheduledReportViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+
+
+class DocumentSerializer(serializers.ModelSerializer):
+    uploaded_by_name = serializers.ReadOnlyField(source='uploaded_by.get_full_name')
+    file_url = serializers.ReadOnlyField()
+    file_extension = serializers.ReadOnlyField()
+
+    class Meta:
+        model = Document
+        fields = '__all__'
+        read_only_fields = ['uploaded_by', 'file_size', 'created_at']
+
+
+class DocumentViewSet(viewsets.ModelViewSet):
+    """
+    Centralized document management.
+
+    Supports filtering by:
+      ?project=<uuid>
+      ?contract=<uuid>
+      ?category=CONTRACT|REPORT|EVALUATION|FINANCIAL|LEGAL|PHOTO|CORRESPONDENCE|OTHER
+      ?public=true  (returns only is_public=True docs — no auth required)
+    """
+    serializer_class = DocumentSerializer
+    parser_classes = [parsers.MultiPartParser, parsers.FormParser, parsers.JSONParser]
+
+    def get_permissions(self):
+        if self.request.query_params.get('public') == 'true' and self.action == 'list':
+            return [permissions.AllowAny()]
+        return [permissions.IsAuthenticated()]
+
+    def get_queryset(self):
+        qs = Document.objects.select_related('uploaded_by', 'project', 'contract')
+
+        public = self.request.query_params.get('public')
+        if public == 'true':
+            qs = qs.filter(is_public=True)
+
+        project_id = self.request.query_params.get('project')
+        if project_id:
+            qs = qs.filter(project_id=project_id)
+
+        contract_id = self.request.query_params.get('contract')
+        if contract_id:
+            qs = qs.filter(contract_id=contract_id)
+
+        category = self.request.query_params.get('category')
+        if category:
+            qs = qs.filter(category=category)
+
+        return qs
+
+    def perform_create(self, serializer):
+        serializer.save(uploaded_by=self.request.user)

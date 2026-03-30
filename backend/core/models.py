@@ -274,3 +274,74 @@ class EmailLog(models.Model):
 
     def __str__(self):
         return f"{self.notification_type} to {self.recipient} ({self.status})"
+
+
+class Document(models.Model):
+    """Centralized document store — any file attached to any object in the system."""
+
+    class Category(models.TextChoices):
+        CONTRACT = 'CONTRACT', 'Contract'
+        REPORT = 'REPORT', 'Report'
+        EVALUATION = 'EVALUATION', 'Evaluation'
+        FINANCIAL = 'FINANCIAL', 'Financial'
+        LEGAL = 'LEGAL', 'Legal'
+        PHOTO = 'PHOTO', 'Photo'
+        CORRESPONDENCE = 'CORRESPONDENCE', 'Correspondence'
+        OTHER = 'OTHER', 'Other'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    file = models.FileField(upload_to='documents/%Y/%m/')
+    category = models.CharField(max_length=30, choices=Category.choices, default=Category.OTHER)
+    file_size = models.PositiveIntegerField(null=True, blank=True, help_text="File size in bytes")
+
+    # Optional links — a document can belong to a project, contract, or both
+    project = models.ForeignKey(
+        'projects.Project', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='documents'
+    )
+    contract = models.ForeignKey(
+        'projects.Contract', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='documents'
+    )
+
+    # Visibility
+    is_public = models.BooleanField(
+        default=False,
+        help_text="Public documents appear on the transparency page"
+    )
+
+    uploaded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='documents')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['project', 'category']),
+            models.Index(fields=['is_public']),
+        ]
+
+    def __str__(self):
+        return f"{self.name} ({self.category})"
+
+    def save(self, *args, **kwargs):
+        if self.file and not self.file_size:
+            try:
+                self.file_size = self.file.size
+            except Exception:
+                pass
+        super().save(*args, **kwargs)
+
+    @property
+    def file_url(self):
+        if self.file:
+            return self.file.url
+        return None
+
+    @property
+    def file_extension(self):
+        if self.file:
+            import os
+            return os.path.splitext(self.file.name)[1].lower()
+        return ''

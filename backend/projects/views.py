@@ -1,6 +1,7 @@
 from rest_framework import viewsets, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from django.http import HttpResponse
 from .models import Project, Contract, ContractAmendment, Milestone, ProjectComment, BeneficiaryFeedback
 from .serializers import (
     ProjectSerializer,
@@ -207,6 +208,28 @@ class ProjectViewSet(viewsets.ModelViewSet):
             },
             "regional_aggregates": aggregates
         })
+
+
+    @action(detail=True, methods=['get'], url_path='export_docx')
+    def export_docx(self, request, pk=None):
+        """
+        GET /api/projects/{id}/export_docx/
+        Returns a Word document (.docx) project status report.
+        """
+        project = self.get_object()
+        try:
+            from core.exports import generate_project_report_docx
+            docx_bytes = generate_project_report_docx(project)
+        except Exception as e:
+            return Response({'error': f'Failed to generate report: {str(e)}'}, status=500)
+
+        filename = f"project_report_{project.name.replace(' ', '_')[:40]}.docx"
+        response = HttpResponse(
+            docx_bytes,
+            content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        )
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
 
 
 class ContractViewSet(viewsets.ModelViewSet):

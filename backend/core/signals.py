@@ -65,3 +65,55 @@ def log_login(sender, request, user, **kwargs):
         ip_address=ip,
         details={'user_agent': request.META.get('HTTP_USER_AGENT', 'unknown')}
     )
+
+# Email Notification Signals
+from .models import Notification
+from .emails import EmailTemplates
+import logging
+
+logger = logging.getLogger(__name__)
+
+@receiver(post_save, sender=Notification)
+def send_notification_email(sender, instance, created, **kwargs):
+    """
+    Automatically send email when a notification is created.
+    Only sends if email is configured and recipient has email address.
+    """
+    if not created:
+        return  # Only on creation, not updates
+
+    if not instance.recipient or not instance.recipient.email:
+        logger.warning(f"Cannot send email for notification {instance.id}: recipient has no email")
+        return
+
+    try:
+        recipient_name = instance.recipient.get_full_name() or instance.recipient.username
+        context = {
+            'recipient_name': recipient_name,
+            'subject': instance.title,
+            'message': instance.message,
+            'action_url': instance.action_url,
+        }
+
+        # Determine template type based on notification type
+        template_mapping = {
+            Notification.Type.TASK_ASSIGNED: 'task_assigned',
+            Notification.Type.APPROVAL_NEEDED: 'claim_pending_approval',
+            Notification.Type.DEADLINE_APPROACHING: 'milestone_deadline',
+            Notification.Type.STATUS_CHANGED: 'grievance_status_change',
+        }
+
+        template_type = template_mapping.get(instance.type, 'grievance_opened')
+
+        # Send email
+        success = EmailTemplates.send_notification_email(
+            recipient_email=instance.recipient.email,
+            notification_type=template_type,
+            context=context
+        )
+
+        if not success:
+            logger.error(f"Failed to send email for notification {instance.id}")
+
+    except Exception as e:
+        logger.error(f"Error in send_notification_email signal for {instance.id}: {str(e)}")

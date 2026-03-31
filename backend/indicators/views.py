@@ -61,90 +61,97 @@ class IndicatorViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'])
     def scorecard(self, request):
-        from django.db.models import Sum, Avg, F
-        
-        # 1. Aggregate Totals by Indicator Name (Enterprise View)
-        # Group indicators by name and unit type to sum them up universally
-        # e.g. "Beneficiaries Reached" across 5 projects.
-        
-        indicators = Indicator.objects.all()
-        # To do this efficiently, we might need more complex queries or iterate.
-        # For MVP/Prototype volume, iteration is fine.
-        
-        scorecard_data = []
-        
-        # Get unique indicator names to aggregate
-        unique_names = indicators.values_list('name', flat=True).distinct()
-        
-        days = int(request.query_params.get('days', 30))
+        from django.db.models import Sum, Subquery, OuterRef
         from django.utils import timezone
         from datetime import timedelta
-        
+
+        days = int(request.query_params.get('days', 30))
         current_end = timezone.now()
         current_start = current_end - timedelta(days=days)
         prev_start = current_start - timedelta(days=days)
-        
-        for name in unique_names:
-            # Get all instances of this indicator
-            instances = Indicator.objects.filter(name=name)
-            first_instance = instances.first()
-            
-            # Aggregate Targets
-            total_target = IndicatorTarget.objects.filter(indicator__name=name).aggregate(Sum('target_value'))['target_value__sum'] or 0
-            
-            # Aggregate Actuals (Latest result for each target)
-            total_actual = 0
-            targets = IndicatorTarget.objects.filter(indicator__name=name)
-            for target in targets:
-                latest_result = target.results.order_by('-date').first()
-                if latest_result:
-                    total_actual += latest_result.value
-            
-            # Calculate Health / Performance
-            performance = 0
-            if total_target > 0:
-                performance = (total_actual / total_target) * 100
-                
-            status = 'OFF_TRACK'
-            if performance >= 90:
-                status = 'ON_TRACK'
-            elif performance >= 70:
-                status = 'AT_RISK'
-                
-            # Trend Data (Time Series for this indicator name)
-            # We want to show how the Total Actual grew over time
-            # Fetch all results, order by date
-            all_results = IndicatorResult.objects.filter(target__indicator__name=name).order_by('date')
-            trend_data = []
-            cumulative_sum = 0
-            # Simple cumulative sum for visualization
-            for res in all_results:
-                cumulative_sum += res.value # This assumes results are incremental additions (e.g. new beneficiaries). 
-                # If results are snapshots (e.g. current infection rate), we shouldn't sum.
-                # For this MVP, let's assume 'NUMBER' type is cumulative-ish or we just plot raw.
-                # Let's plot raw values over time for now to show activity.
-                trend_data.append({
-                    "date": res.date,
-                    "value": res.value, # Individual record
-                    "cumulative": cumulative_sum # Cumulative
-                })
 
-            # Performance for current period
-            current_results = IndicatorResult.objects.filter(
-                target__indicator__name=name,
-                date__range=[current_start, current_end]
-            ).aggregate(Sum('value'))['value__sum'] or 0
-            
-            prev_results = IndicatorResult.objects.filter(
-                target__indicator__name=name,
-                date__range=[prev_start, current_start]
-            ).aggregate(Sum('value'))['value__sum'] or 0
-            
-            growth = 0
-            if prev_results > 0:
-                growth = ((current_results - prev_results) / prev_results) * 100
-            elif current_results > 0:
-                growth = 100
+        # Load all indicators, targets and results in 3 queries — no per-name loops
+        indicators = Indicator.objects.all()
+        all_targets = (
+            IndicatorTarget.objects
+            .select_related('indicator')
+            .prefetch_related('results')
+        )
+        all_results_qs = (
+            IndicatorResult.objects
+            .select_related('target__indicator')
+            .order_by('date')
+        )
+
+        # Build lookup maps in Python
+        # indicator_name → first Indicator instance (for unit/direction)
+        name_to_indicator: dict = {}
+        for ind in indicators:
+            name_to_indicator.setdefault(ind.name, ind)
+
+        unique_names = list(name_to_indicator.keys())
+
+        # target_id → latest verified result value
+        # We prefetch results, so no extra queries here
+        name_to_targets: dict = {}
+        for t in all_targets:
+            name_to_targets.setdefault(t.indicator.name, []).append(t)
+
+        # All results grouped by indicator name
+        name_to_results: dict = {}
+        for res in all_results_qs:
+            name_to_results.setdefault(res.target.indicator.name, []).append(res)
+
+        scorecard_data = []
+
+        for name in unique_names:
+            first_instance = name_to_indicator[name]
+            targets = name_to_targets.get(name, [])
+
+            total_target = sum(float(t.target_value or 0) for t in targets)
+
+            # Latest verified result per target (already prefetched)
+            total_actual = 0
+            for t in targets:
+                latest = sorted(
+                    [r for r in t.results.all() if r.status == 'VERIFIED'],
+                    key=lambda r: r.date,
+                    reverse=True
+                )
+                if latest:
+                    total_actual += float(latest[0].value)
+
+            performance = (total_actual / total_target * 100) if total_target > 0 else 0
+
+            track_status = 'OFF_TRACK'
+            if performance >= 90:
+                track_status = 'ON_TRACK'
+            elif performance >= 70:
+                track_status = 'AT_RISK'
+
+            # Trend and period aggregations from pre-fetched list
+            all_results = name_to_results.get(name, [])
+            trend_data = []
+            cumulative = 0
+            for res in all_results:
+                cumulative += float(res.value)
+                trend_data.append({"date": res.date, "value": float(res.value), "cumulative": cumulative})
+
+            current_period = sum(
+                float(r.value) for r in all_results
+                if current_start.date() <= r.date <= current_end.date()
+            )
+            prev_period = sum(
+                float(r.value) for r in all_results
+                if prev_start.date() <= r.date < current_start.date()
+            )
+
+            if prev_period > 0:
+                growth = (current_period - prev_period) / prev_period * 100
+            elif current_period > 0:
+                growth = 100.0
+            else:
+                growth = 0.0
 
             scorecard_data.append({
                 "name": name,
@@ -152,12 +159,12 @@ class IndicatorViewSet(viewsets.ModelViewSet):
                 "direction": first_instance.direction,
                 "total_target": total_target,
                 "total_actual": total_actual,
-                "current_period_actual": current_results,
-                "prev_period_actual": prev_results,
+                "current_period_actual": current_period,
+                "prev_period_actual": prev_period,
                 "growth_percent": round(growth, 1),
                 "performance_percent": round(performance, 1),
-                "status": status,
-                "trend": trend_data[-10:] # Last 10 data points for sparkline
+                "status": track_status,
+                "trend": trend_data[-10:],
             })
             
         return Response(scorecard_data)
@@ -183,7 +190,6 @@ class LogFrameNodeViewSet(viewsets.ModelViewSet):
     serializer_class = LogFrameNodeSerializer
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [django_filters.rest_framework.DjangoFilterBackend]
-    filterset_fields = ['project', 'parent']
     filterset_fields = ['project', 'parent']
 
 class FrameworkTemplateViewSet(viewsets.ModelViewSet):
@@ -262,13 +268,22 @@ class IndicatorResultViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'])
     def latest_impact(self, request):
-        # Return latest results for indicators marked as IMPACT level
-        # ONLY return VERIFIED results for the official impact dashboard
-        latest_results = IndicatorResult.objects.filter(
-            target__indicator__level='IMPACT',
-            status='VERIFIED'
-        ).order_by('target__indicator__name', '-date').distinct('target__indicator__name')
-        
+        # Return latest verified result per IMPACT indicator.
+        # distinct('field') is PostgreSQL-only, so we deduplicate in Python
+        # to keep SQLite compatibility in development.
+        results = (
+            IndicatorResult.objects
+            .filter(target__indicator__level='IMPACT', status='VERIFIED')
+            .select_related('target__indicator')
+            .order_by('target__indicator__name', '-date')
+        )
+        seen: set = set()
+        latest_results = []
+        for r in results:
+            key = r.target.indicator.name
+            if key not in seen:
+                seen.add(key)
+                latest_results.append(r)
         return Response(IndicatorResultSerializer(latest_results, many=True).data)
 
     @action(detail=True, methods=['post'])

@@ -95,7 +95,7 @@ class UserViewSet(viewsets.ModelViewSet):
     serializer_class = UserSerializer
 
     def get_permissions(self):
-        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+        if self.action in ['create', 'update', 'partial_update', 'destroy', 'reset_password', 'assign_role']:
             return [permissions.IsAuthenticated(), IsAdmin()]
         return [permissions.IsAuthenticated()]
 
@@ -320,7 +320,7 @@ class ReportsViewSet(viewsets.ViewSet):
     def export(self, request):
         """Export standard reports to Excel or PDF"""
         report_type = request.query_params.get('type', 'portfolio')
-        fmt = request.query_params.get('format', 'csv')
+        fmt = request.query_params.get('export_format', 'csv')
         
         from django.http import HttpResponse
         import io
@@ -362,6 +362,35 @@ class ReportsViewSet(viewsets.ViewSet):
                     (i.notes[:50] + '...') if i.notes and len(i.notes) > 50 else (i.notes or '')
                 ])
         
+        elif report_type == 'contracts':
+            from projects.models import Contract as ContractModel, Milestone
+            from datetime import date
+            contracts = ContractModel.objects.select_related('project', 'contractor').prefetch_related('milestones')
+            data = [['Contract No.', 'Project', 'Contractor', 'Type', 'Value (ZMW)', 'Status',
+                     'Start Date', 'End Date', 'Milestones Total', 'Completed', 'Overdue', 'Chiefdom']]
+            today = date.today()
+            for c in contracts:
+                ms_all = c.milestones.all()
+                ms_completed = ms_all.filter(status='COMPLETED').count()
+                ms_overdue = ms_all.filter(status__in=['PENDING', 'IN_PROGRESS'], due_date__lt=today).count()
+                status = c.status
+                if c.end_date < today and c.status == 'ACTIVE':
+                    status = 'OVERDUE'
+                data.append([
+                    c.contract_number or str(c.id)[:8],
+                    c.project.name,
+                    c.contractor.name,
+                    c.get_contract_type_display(),
+                    float(c.total_value),
+                    status,
+                    str(c.start_date),
+                    str(c.end_date),
+                    ms_all.count(),
+                    ms_completed,
+                    ms_overdue,
+                    c.chiefdom or 'N/A',
+                ])
+
         # 2. Format Response
         if fmt == 'csv':
             import csv
@@ -415,6 +444,45 @@ class ReportsViewSet(viewsets.ViewSet):
             buffer.close()
             return response
             
+        elif fmt == 'docx':
+            from docx import Document as DocxDocument
+            from docx.shared import Pt, RGBColor
+            from docx.enum.text import WD_ALIGN_PARAGRAPH
+
+            response = HttpResponse(
+                content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+            )
+            response['Content-Disposition'] = f'attachment; filename="{filename}.docx"'
+
+            doc = DocxDocument()
+            heading = doc.add_heading(f'MonEva Report: {report_type.capitalize()}', 0)
+            heading.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            for run in heading.runs:
+                run.font.color.rgb = RGBColor(0x1A, 0x4D, 0x2E)
+
+            if data:
+                table = doc.add_table(rows=1, cols=len(data[0]))
+                table.style = 'Table Grid'
+                hdr_cells = table.rows[0].cells
+                for i, col in enumerate(data[0]):
+                    hdr_cells[i].text = str(col)
+                    for para in hdr_cells[i].paragraphs:
+                        for run in para.runs:
+                            run.bold = True
+                            run.font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
+                    hdr_cells[i]._tc.get_or_add_tcPr()
+
+                for row_data in data[1:]:
+                    row_cells = table.add_row().cells
+                    for i, val in enumerate(row_data):
+                        row_cells[i].text = str(val)
+
+            buffer = io.BytesIO()
+            doc.save(buffer)
+            response.write(buffer.getvalue())
+            buffer.close()
+            return response
+
         return Response({"error": "Invalid format"}, status=400)
 
     @action(detail=False, methods=['get'])
@@ -438,8 +506,9 @@ class ReportsViewSet(viewsets.ViewSet):
         from finance.models import PaymentClaim
         from django.db.models import Sum
 
-        target_currency = request.query_params.get('currency', 'ZMW') # Default to ZMW as requested
-        exchange_rate = 27 if target_currency == 'ZMW' else 1 # Simple mock rate: 1 USD = 27 ZMW
+        from django.conf import settings
+        target_currency = request.query_params.get('currency', 'ZMW')
+        exchange_rate = settings.USD_TO_ZMW_RATE if target_currency == 'ZMW' else 1
 
         # Base values are in USD
         total_budget_usd = Contract.objects.aggregate(Sum('total_value'))['total_value__sum'] or 0
@@ -808,7 +877,7 @@ class GlobalSearchViewSet(viewsets.ViewSet):
         } for g in grievances]
         
         # Search Users (only for admins)
-        if request.user.is_staff or (request.user.role and request.user.role.name == 'Administrator'):
+        if request.user.is_staff or request.user.is_admin_user:
             users = User.objects.filter(
                 Q(username__icontains=query) |
                 Q(first_name__icontains=query) |

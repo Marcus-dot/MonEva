@@ -23,6 +23,10 @@ class Role(models.Model):
     description = models.TextField(blank=True)
     permissions = models.ManyToManyField(Permission, related_name='roles', blank=True)
     is_system_role = models.BooleanField(default=False, help_text="System roles cannot be deleted")
+    is_admin = models.BooleanField(
+        default=False,
+        help_text="Users with this role have full system access (maker-checker bypass, admin APIs)"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -54,6 +58,12 @@ class User(AbstractUser):
     def __str__(self):
         return f"{self.username} ({self.role.name if self.role else 'No Role'})"
     
+    @property
+    def is_admin_user(self) -> bool:
+        """True if the user's role has the is_admin flag set. Use this instead
+        of comparing role.name strings throughout the codebase."""
+        return bool(self.role and self.role.is_admin)
+
     def has_permission(self, permission_code):
         """Check if user has a specific permission through their role"""
         if not self.role:
@@ -171,11 +181,16 @@ class Notification(models.Model):
         # Map model names to their detail page URLs
         url_mapping = {
             'PaymentClaim': f'/dashboard/finance/{self.related_id}',
-            'Evaluation': f'/dashboard/evaluations/{self.related_id}',
+            # Evaluations live inside the project sustainability/inspections tabs
+            'Evaluation': '/dashboard/projects/',
+            'PostProjectEvaluation': '/dashboard/projects/',
+            'ImpactFollowUp': '/dashboard/projects/',
             'Project': f'/dashboard/projects/{self.related_id}',
             'Investigation': f'/dashboard/investigations/{self.related_id}',
             'Grievance': f'/dashboard/grievances/{self.related_id}',
-            'Contract': f'/dashboard/contracts/{self.related_id}',
+            # Contracts live inside the project contracts tab
+            'Contract': '/dashboard/projects/',
+            'Milestone': '/dashboard/projects/',
             'Inspection': f'/dashboard/inspections/{self.related_id}',
         }
         

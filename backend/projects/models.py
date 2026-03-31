@@ -142,6 +142,38 @@ class Project(models.Model):
         if errors:
             raise ValidationError(errors)
 
+class ContractTemplate(models.Model):
+    """Reusable contract templates for standardised contract creation."""
+    class TemplateType(models.TextChoices):
+        WORKS = 'WORKS', 'Works'
+        SUPPLY = 'SUPPLY', 'Supply of Goods'
+        SERVICE = 'SERVICE', 'Service'
+        CONSULTANCY = 'CONSULTANCY', 'Consultancy'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=255, unique=True)
+    description = models.TextField(blank=True)
+    contract_type = models.CharField(max_length=20, choices=TemplateType.choices, default=TemplateType.WORKS)
+    default_scope_of_works = models.TextField(blank=True, help_text="Boilerplate scope text pre-filled on new contracts")
+    default_payment_terms = models.TextField(blank=True, help_text="Boilerplate payment terms")
+    default_retention_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=10.00)
+    default_defects_liability_period = models.PositiveIntegerField(default=365, help_text="Days")
+    default_milestones = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="List of {title, description, target_percent, value_fraction} objects"
+    )
+    document = models.FileField(upload_to='contract_templates/', null=True, blank=True, help_text="Optional template document (DOCX/PDF)")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.name} ({self.get_contract_type_display()})"
+
+    class Meta:
+        ordering = ['name']
+
+
 class Contract(models.Model):
     class Status(models.TextChoices):
         DRAFT = 'DRAFT', 'Draft'
@@ -186,8 +218,12 @@ class Contract(models.Model):
     scope_of_works = models.TextField(blank=True)
     payment_terms = models.TextField(blank=True, help_text="e.g. 30 days from certified invoice")
 
-    # Document
+    # Document & template
     document = models.FileField(upload_to='contracts/', null=True, blank=True)
+    template = models.ForeignKey(
+        ContractTemplate, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='contracts', help_text="Template this contract was created from"
+    )
 
     created_at = models.DateTimeField(auto_now_add=True, null=True)
     updated_at = models.DateTimeField(auto_now=True, null=True)

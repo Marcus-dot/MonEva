@@ -155,13 +155,70 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 AUTH_USER_MODEL = 'core.User'
 
-CORS_ALLOW_ALL_ORIGINS = True
+
+# CORS — restrict to known frontend origins in production
+CORS_ALLOW_ALL_ORIGINS = os.getenv('CORS_ALLOW_ALL_ORIGINS', 'False') == 'True'
+CORS_ALLOWED_ORIGINS = [
+    o.strip() for o in os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:3000').split(',') if o.strip()
+]
+# Required for cookies to be sent cross-origin (credentials: 'include')
+CORS_ALLOW_CREDENTIALS = True
+
+# Exchange rate (ZMW per 1 USD) — update periodically or replace with live API
+USD_TO_ZMW_RATE = float(os.getenv('USD_TO_ZMW_RATE', '27'))
+
+# Grievance rate limiting — set to False to disable (e.g. internal-only deployments)
+GRIEVANCE_RATE_LIMIT_ENABLED = os.getenv('GRIEVANCE_RATE_LIMIT_ENABLED', 'True') == 'True'
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
+        # Cookie-based JWT (web app) — reads from httpOnly cookie
+        'core.authentication.CookieJWTAuthentication',
+        # Fall back to Bearer token for API clients / mobile
         'rest_framework_simplejwt.authentication.JWTAuthentication',
-        'rest_framework.authentication.SessionAuthentication', # Optional, useful for browerable API
-    )
+    ),
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+        'rest_framework.throttling.ScopedRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '60/hour',
+        'user': '2000/hour',
+        'login': '10/minute',       # brute-force protection on login
+        'grievance': '20/hour',     # public grievance submission
+    },
+}
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'WARNING',
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': os.getenv('DJANGO_LOG_LEVEL', 'WARNING'),
+            'propagate': False,
+        },
+        'core': {'handlers': ['console'], 'level': 'INFO', 'propagate': False},
+        'indicators': {'handlers': ['console'], 'level': 'INFO', 'propagate': False},
+        'grievances': {'handlers': ['console'], 'level': 'INFO', 'propagate': False},
+    },
 }
 
 from datetime import timedelta

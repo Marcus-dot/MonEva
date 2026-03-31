@@ -130,7 +130,7 @@ def resolve_formula(formula: str, target, project) -> float:
             val = 0.0
         else:
             latest = ref_target.results.filter(status='VERIFIED').order_by('-date').first()
-            val = float(latest.value) if latest else float(ref_target.baseline_value)
+            val = float(latest.value) if latest else float(ref_target.baseline_value or 0)
         resolved = resolved.replace(f'{{{ind_id}}}', str(val))
 
     return evaluate_formula(resolved)

@@ -109,8 +109,8 @@ class PaymentClaimViewSet(viewsets.ModelViewSet):
         new_status = serializer.validated_data.get('status')
         if new_status == PaymentClaim.Status.APPROVED and instance.status != PaymentClaim.Status.APPROVED:
             # Prevent Maker from being Checker UNLESS Admin
-            if instance.prepared_by == user and user.role != 'ADMIN':
-                 raise PermissionDenied("Maker-Checker Violation: You cannot approve a claim you prepared.")
+            if instance.prepared_by == user and not user.is_admin_user:
+                raise PermissionDenied("Maker-Checker Violation: You cannot approve a claim you prepared.")
             
             serializer.save(approved_by=user)
         else:

@@ -1,5 +1,12 @@
 from rest_framework import serializers
-from .models import Project, Contract, ContractAmendment, Milestone, ProjectComment, BeneficiaryFeedback
+from .models import Project, Contract, ContractAmendment, ContractTemplate, Milestone, ProjectComment, BeneficiaryFeedback
+
+class ContractTemplateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ContractTemplate
+        fields = '__all__'
+        read_only_fields = ['created_at', 'updated_at']
+
 
 class MilestoneSerializer(serializers.ModelSerializer):
     class Meta:
@@ -18,6 +25,7 @@ class ContractSerializer(serializers.ModelSerializer):
     milestones = MilestoneSerializer(many=True, read_only=True)
     amendments = ContractAmendmentSerializer(many=True, read_only=True)
     contractor_name = serializers.ReadOnlyField(source='contractor.name')
+    template_name = serializers.ReadOnlyField(source='template.name')
     is_expired = serializers.ReadOnlyField()
 
     class Meta:

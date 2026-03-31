@@ -1,43 +1,40 @@
 from rest_framework import permissions
 
 class IsAdmin(permissions.BasePermission):
-    """Check if user has Administrator role or manage_roles permission"""
+    """True if the user's role has is_admin=True, or has the manage_roles permission."""
     def has_permission(self, request, view):
         if not request.user.is_authenticated:
             return False
-        # Check if user has Administrator role
-        if request.user.role and request.user.role.name == 'Administrator':
+        if request.user.is_admin_user:
             return True
-        # Or check if user has manage_roles permission
         return request.user.has_permission('manage_roles')
 
 class IsProjectManager(permissions.BasePermission):
-    """Check if user has Project Manager role or higher"""
+    """True if the user is an admin or has the project_management permission."""
     def has_permission(self, request, view):
         if not request.user.is_authenticated:
             return False
-        if request.user.role:
-            return request.user.role.name in ['Administrator', 'Project Manager']
-        return False
+        if request.user.is_admin_user:
+            return True
+        return request.user.has_permission('manage_projects')
 
 class IsFinance(permissions.BasePermission):
-    """Check if user has finance permissions"""
+    """True if the user is an admin or has the finance permission."""
     def has_permission(self, request, view):
         if not request.user.is_authenticated:
             return False
-        # Check for Administrator or Project Manager roles (they have finance perms)
-        if request.user.role:
-            return request.user.role.name in ['Administrator', 'Project Manager']
-        return False
+        if request.user.is_admin_user:
+            return True
+        return request.user.has_permission('manage_finance')
 
 class IsInspector(permissions.BasePermission):
-    """Check if user has inspection permissions"""
+    """True if the user is an admin or has the inspection permission."""
     def has_permission(self, request, view):
         if not request.user.is_authenticated:
             return False
-        if request.user.role:
-            return request.user.role.name in ['Administrator', 'Project Manager', 'Evaluator']
-        return False
+        if request.user.is_admin_user:
+            return True
+        return request.user.has_permission('manage_inspections')
 
 class ReadOnly(permissions.BasePermission):
     """Allow read-only access"""

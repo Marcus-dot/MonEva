@@ -2,11 +2,12 @@ from rest_framework import viewsets, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.http import HttpResponse
-from .models import Project, Contract, ContractAmendment, Milestone, ProjectComment, BeneficiaryFeedback
+from .models import Project, Contract, ContractAmendment, ContractTemplate, Milestone, ProjectComment, BeneficiaryFeedback
 from .serializers import (
     ProjectSerializer,
     ContractSerializer,
     ContractAmendmentSerializer,
+    ContractTemplateSerializer,
     MilestoneSerializer,
     ProjectCommentSerializer,
     BeneficiaryFeedbackSerializer,
@@ -258,6 +259,63 @@ class ContractAmendmentViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(approved_by=self.request.user)
+
+
+class ContractTemplateViewSet(viewsets.ModelViewSet):
+    queryset = ContractTemplate.objects.all()
+    serializer_class = ContractTemplateSerializer
+    permission_classes = [permissions.IsAuthenticated, IsAdmin | ReadOnly]
+
+    @action(detail=True, methods=['post'])
+    def instantiate(self, request, pk=None):
+        """Create a new Contract pre-filled from this template."""
+        template = self.get_object()
+        project_id = request.data.get('project')
+        contractor_id = request.data.get('contractor')
+        start_date = request.data.get('start_date')
+        end_date = request.data.get('end_date')
+        total_value = request.data.get('total_value')
+
+        if not all([project_id, contractor_id, start_date, end_date, total_value]):
+            return Response({'error': 'project, contractor, start_date, end_date, total_value are required.'}, status=400)
+
+        from .models import Project
+        from core.models import Organization
+        try:
+            project = Project.objects.get(pk=project_id)
+            contractor = Organization.objects.get(pk=contractor_id)
+        except (Project.DoesNotExist, Organization.DoesNotExist) as e:
+            return Response({'error': str(e)}, status=400)
+
+        contract = Contract.objects.create(
+            project=project,
+            contractor=contractor,
+            contract_type=template.contract_type,
+            scope_of_works=template.default_scope_of_works,
+            payment_terms=template.default_payment_terms,
+            retention_percentage=template.default_retention_percentage,
+            defects_liability_period=template.default_defects_liability_period,
+            template=template,
+            start_date=start_date,
+            end_date=end_date,
+            total_value=total_value,
+        )
+
+        # Create default milestones from template
+        for ms in template.default_milestones:
+            import decimal
+            value_fraction = decimal.Decimal(str(ms.get('value_fraction', 0)))
+            Milestone.objects.create(
+                contract=contract,
+                title=ms.get('title', 'Milestone'),
+                description=ms.get('description', ''),
+                target_percent=ms.get('target_percent', 0),
+                value_amount=contract.total_value * value_fraction,
+                due_date=end_date,
+            )
+
+        serializer = ContractSerializer(contract)
+        return Response(serializer.data, status=201)
 
 
 class MilestoneViewSet(viewsets.ModelViewSet):

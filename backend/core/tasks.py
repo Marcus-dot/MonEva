@@ -369,7 +369,7 @@ def send_daily_digests():
             details.append(f"{my_evals_count} impact evaluations coming up")
             
         # 3. Supervisor Escalations (Admin/Manager only)
-        if user.role and user.role.name in ['ADMIN', 'MANAGER']:
+        if user.is_admin_user or user.has_permission('manage_projects'):
             # Grievances > 7 days
             overdue_grievances = Grievance.objects.filter(
                 status__in=['OPEN', 'INVESTIGATING'],
@@ -402,3 +402,41 @@ def send_daily_digests():
             notifications_sent += 1
             
     return f"Sent daily digests to {notifications_sent} users"
+
+
+def send_defects_liability_reminders():
+    """
+    Alert project managers when a contract's defects liability period is ending.
+    Checks for contracts where completion date + defects_liability_period is within 30 or 7 days.
+    Uses end_date as a proxy for completion date (completed contracts).
+    """
+    now = timezone.now()
+    today = now.date()
+    alerted = 0
+
+    closed_contracts = Contract.objects.filter(status__in=['CLOSED', 'EXPIRED'])
+
+    for contract in closed_contracts:
+        dlp_end = contract.end_date + timedelta(days=contract.defects_liability_period)
+        days_remaining = (dlp_end - today).days
+
+        if days_remaining in (30, 7):
+            manager = get_project_manager(contract.project)
+            if manager:
+                urgency = "30 days" if days_remaining == 30 else "7 days"
+                Notification.create_notification(
+                    recipient=manager,
+                    title=f"Defects Liability Period Ending in {urgency}",
+                    message=(
+                        f"Contract {contract.contract_number or str(contract.id)[:8]} with "
+                        f"{contract.contractor.name} has a defects liability period ending on "
+                        f"{dlp_end.strftime('%Y-%m-%d')}. Ensure all defects are reported and "
+                        f"retention funds are ready for release."
+                    ),
+                    notification_type=Notification.Type.DEADLINE_APPROACHING,
+                    related_model='Contract',
+                    related_id=str(contract.id)
+                )
+                alerted += 1
+
+    return f"Sent {alerted} defects liability period reminders"

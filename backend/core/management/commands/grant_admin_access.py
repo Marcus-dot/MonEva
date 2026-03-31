@@ -32,14 +32,15 @@ class Command(BaseCommand):
                         self.stdout.write(f'  - {u.username}')
                     return
                 
-                # Get Administrator role
-                try:
-                    admin_role = Role.objects.get(name='Administrator')
-                    self.stdout.write(f'✓ Found Administrator role with {admin_role.permissions.count()} permissions')
-                except Role.DoesNotExist:
-                    self.stdout.write(self.style.ERROR('✗ Administrator role not found!'))
-                    self.stdout.write('Run: python manage.py migrate core')
-                    return
+                # Get Administrator role (or create it)
+                admin_role, created = Role.objects.get_or_create(
+                    name='Administrator',
+                    defaults={'is_system_role': True, 'is_admin': True, 'description': 'Full system access'}
+                )
+                if not admin_role.is_admin:
+                    admin_role.is_admin = True
+                    admin_role.save(update_fields=['is_admin'])
+                self.stdout.write(f'{"✓ Created" if created else "✓ Found"} Administrator role with {admin_role.permissions.count()} permissions')
                 
                 # Assign role to user
                 old_role = user.role.name if user.role else 'None'

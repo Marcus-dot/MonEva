@@ -117,16 +117,16 @@ def route_claim_for_approval(instance):
     
     # 1. High Risk Rule (Score > 70) -> Route to Admin
     if risk_score > 70:
-        approver = User.objects.filter(role__name__iexact='Admin').first()
+        approver = User.objects.filter(role__is_admin=True).first()
         reason = "High Risk Level"
     # 2. Tier 3 Rule (> 100k) -> Route to Admin
     elif amount > 100000:
-        approver = User.objects.filter(role__name__iexact='Admin').first()
+        approver = User.objects.filter(role__is_admin=True).first()
         reason = "Large Amount (> ZMW 100,000)"
     # 3. Tier 2 Rule (10k - 100k) -> Route to Finance/Manager
     elif amount > 10000:
         # Try to find a Finance user first
-        approver = User.objects.filter(role__name__iexact='Finance').first()
+        approver = User.objects.filter(role__permissions__code='manage_finance').first()
         reason = "Medium Amount (ZMW 10,000 - 100,000)"
     # 4. Tier 1 Rule (< 10k) -> Route to Project Manager
     else:

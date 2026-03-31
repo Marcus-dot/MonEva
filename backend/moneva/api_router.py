@@ -6,8 +6,8 @@ from core.views import (
     DocumentViewSet
 )
 from projects.views import (
-    ProjectViewSet, ContractViewSet, ContractAmendmentViewSet, MilestoneViewSet,
-    ProjectCommentViewSet, BeneficiaryFeedbackViewSet,
+    ProjectViewSet, ContractViewSet, ContractAmendmentViewSet, ContractTemplateViewSet,
+    MilestoneViewSet, ProjectCommentViewSet, BeneficiaryFeedbackViewSet,
     BeneficiaryViewSet, SDGViewSet
 )
 from assessments.views import InspectionViewSet, EvidenceViewSet, PostProjectEvaluationViewSet, ImpactFollowUpViewSet, EvaluationTemplateViewSet
@@ -34,6 +34,7 @@ router.register(r'projects', ProjectViewSet)
 router.register(r'project-comments', ProjectCommentViewSet)
 router.register(r'contracts', ContractViewSet)
 router.register(r'contract-amendments', ContractAmendmentViewSet)
+router.register(r'contract-templates', ContractTemplateViewSet, basename='contract-templates')
 router.register(r'milestones', MilestoneViewSet)
 router.register(r'beneficiary-feedback', BeneficiaryFeedbackViewSet, basename='beneficiary-feedback')
 router.register(r'beneficiaries', BeneficiaryViewSet)
